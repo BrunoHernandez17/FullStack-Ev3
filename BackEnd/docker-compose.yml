@@ -1,0 +1,108 @@
+services:
+  # ==========================================
+  # 1. API GATEWAY
+  # ==========================================
+  api-gateway:
+    build: ./sanos-y-salvos-gateway
+    container_name: api_gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - MS_IDENTITY_URI=http://ms-identity:8081
+      - MS_REPORTING_URI=http://ms-reporting:8082
+      - MS_GEOLOCATION_URI=http://ms-geolocation:8083
+    networks:
+      - backend-network
+    depends_on:
+      - ms-identity
+      - ms-geolocation
+      - ms-reporting
+
+  # ==========================================
+  # 2. MICROSERVICIO: IDENTIDAD (Usuarios/Auth)
+  # ==========================================
+  ms-identity:
+    build: ./ms-identity
+    container_name: ms_identity
+    env_file:
+      - ../.env
+    environment:
+      - IDENTITY_DB_URL=jdbc:postgresql://host.docker.internal:5432/${IDENTITY_DB_NAME:-sanos_y_salvos_identity}
+      - IDENTITY_DB_USERNAME=${DB_USERNAME:-postgres}
+      - IDENTITY_DB_PASSWORD=${DB_PASSWORD:-route}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - backend-network
+
+  # ==========================================
+  # 3. MICROSERVICIO: GEOLOCALIZACIÓN
+  # ==========================================
+  ms-geolocation:
+    build: ./ms-geolocation
+    container_name: ms_geolocation
+    env_file:
+      - ../.env
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/${GEOLOCATION_DB_NAME:-sanos_y_salvos_geo}
+      - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-postgres}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-route}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - backend-network
+
+  # ==========================================
+  # 4. MICROSERVICIO: REPORTES
+  # ==========================================
+  ms-reporting:
+    build: ./ms-reporting
+    container_name: ms_reporting
+    env_file:
+      - ../.env
+    environment:
+      - MONGODB_URI=mongodb://db-mongodb:27017/ms-reporting_db
+      - SPRING_DATA_MONGODB_URI=mongodb://db-mongodb:27017/ms-reporting_db
+      - SPRING_MONGODB_URI=mongodb://db-mongodb:27017/ms-reporting_db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - backend-network
+    depends_on:
+      - db-mongodb
+
+  # ==========================================
+  # 4.5. BASE DE DATOS: MONGODB (Dockerized fallback for loopback)
+  # ==========================================
+  db-mongodb:
+    image: mongo:6.0
+    container_name: db_mongodb
+    ports:
+      - "27018:27017"
+    networks:
+      - backend-network
+
+  # ==========================================
+  # 5. FRONTEND (Vite App)
+  # ==========================================
+  frontend:
+    build: ../FrontEnd
+    container_name: frontend_app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../FrontEnd:/app
+      - /app/node_modules
+    environment:
+      - BACKEND_API_URL=http://api-gateway:8080
+    networks:
+      - backend-network
+    depends_on:
+      - api-gateway
+
+# ==========================================
+# REDES
+# ==========================================
+networks:
+  backend-network:
+    driver: bridge
