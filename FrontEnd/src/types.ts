@@ -16,7 +16,9 @@ export interface Report {
 }
 
 export interface User {
+  id?: number;
   email: string;
   role: 'admin' | 'user';
   name: string;
+  token?: string;
 }

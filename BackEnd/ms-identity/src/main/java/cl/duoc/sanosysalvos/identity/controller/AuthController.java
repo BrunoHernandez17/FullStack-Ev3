@@ -2,32 +2,49 @@ package cl.duoc.sanosysalvos.identity.controller;
 
 import cl.duoc.sanosysalvos.identity.model.Usuario;
 import cl.duoc.sanosysalvos.identity.repository.UsuarioRepository;
+import cl.duoc.sanosysalvos.identity.security.JwUtils;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Autenticación", description = "Endpoints para registro, login y listado de usuarios")
 public class AuthController {
 
     private final UsuarioRepository usuarioRepository;
+    private final AuthenticationManager authenticationManager;
+    private final PasswordEncoder passwordEncoder;
+    private final JwUtils jwtUtils;
 
     @Autowired
-    public AuthController(UsuarioRepository usuarioRepository) {
+    public AuthController(UsuarioRepository usuarioRepository,
+                          AuthenticationManager authenticationManager,
+                          PasswordEncoder passwordEncoder,
+                          JwUtils jwtUtils) {
         this.usuarioRepository = usuarioRepository;
+        this.authenticationManager = authenticationManager;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtils = jwtUtils;
     }
 
     @GetMapping("/usuarios")
+    @Operation(summary = "Listar usuarios", description = "Obtiene la lista completa de usuarios registrados. Requiere autenticación por Bearer Token.")
     public ResponseEntity<List<Usuario>> listarUsuarios() {
         return ResponseEntity.ok(usuarioRepository.findAll());
     }
 
     @PostMapping("/register")
+    @Operation(summary = "Registrar un usuario", description = "Registra un nuevo usuario en el sistema. Todos los registros web inician con rol 'USER' por seguridad.")
     public ResponseEntity<Usuario> register(@RequestBody Usuario usuario) {
         prepararUsuarioParaRegistro(usuario);
         Usuario nuevoUsuario = usuarioRepository.save(usuario);
@@ -35,6 +52,7 @@ public class AuthController {
     }
 
     @PostMapping("/usuarios")
+    @Operation(summary = "Crear un usuario (Admin/Alternativo)", description = "Creación alternativa de usuarios. Al igual que el registro público, le asigna el rol 'USER'.")
     public ResponseEntity<Usuario> crearUsuario(@RequestBody Usuario usuario) {
         prepararUsuarioParaRegistro(usuario);
         Usuario nuevoUsuario = usuarioRepository.save(usuario);
@@ -42,6 +60,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Iniciar sesión", description = "Autentica un usuario con su email y contraseña, retornando un token JWT.")
     public ResponseEntity<Map<String, Object>> login(@RequestBody Usuario credenciales) {
         if (credenciales.getEmail() == null || credenciales.getEmail().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El email es obligatorio.");
@@ -51,16 +70,22 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La contraseña es obligatoria.");
         }
 
-        Usuario usuario = usuarioRepository.findByEmail(credenciales.getEmail())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas."));
-
-        if (!usuario.getPassword().equals(credenciales.getPassword())) {
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(credenciales.getEmail(), credenciales.getPassword())
+            );
+        } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas.");
         }
 
+        Usuario usuario = usuarioRepository.findByEmail(credenciales.getEmail())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales incorrectas."));
+
+        String token = jwtUtils.generateToken(usuario.getEmail());
+
         Map<String, Object> response = Map.of(
                 "message", "Inicio de sesión exitoso.",
-                "token", UUID.randomUUID().toString(),
+                "token", token,
                 "usuario", Map.of(
                         "id", usuario.getId(),
                         "nombre", usuario.getNombre(),
@@ -89,6 +114,7 @@ public class AuthController {
 
         // Por seguridad y requerimiento del usuario, todos los registros nuevos inician como USER.
         // Los privilegios de ADMIN se asignan exclusivamente de manera directa en la Base de Datos PostgreSQL.
+        usuario.setPassword(passwordEncoder.encode(usuario.getPassword()));
         usuario.setRol("USER");
     }
 }

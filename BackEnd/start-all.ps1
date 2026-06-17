@@ -34,42 +34,49 @@ $dbPassword = if ($env:DB_PASSWORD) { $env:DB_PASSWORD } else { "route" }
 $identityDbName = if ($env:IDENTITY_DB_NAME) { $env:IDENTITY_DB_NAME } else { "sanos_y_salvos_identity" }
 $geoDbName = if ($env:GEOLOCATION_DB_NAME) { $env:GEOLOCATION_DB_NAME } else { "sanos_y_salvos_geo" }
 
-$env:IDENTITY_DB_URL = "jdbc:postgresql://${dbHost}:${dbPort}/${identityDbName}"
-$env:IDENTITY_DB_USERNAME = $dbUsername
-$env:IDENTITY_DB_PASSWORD = $dbPassword
+$identityDbUrl = "jdbc:postgresql://${dbHost}:${dbPort}/${identityDbName}"
+$identityDbUsername = $dbUsername
+$identityDbPassword = $dbPassword
 
-$env:SPRING_DATASOURCE_URL = "jdbc:postgresql://${dbHost}:${dbPort}/${geoDbName}"
-$env:SPRING_DATASOURCE_USERNAME = $dbUsername
-$env:SPRING_DATASOURCE_PASSWORD = $dbPassword
+$geoDbUrl = "jdbc:postgresql://${dbHost}:${dbPort}/${geoDbName}"
+$geoDbUsername = $dbUsername
+$geoDbPassword = $dbPassword
 
-$env:MONGODB_URI = if ($env:MONGODB_URI) { $env:MONGODB_URI } else { "mongodb://localhost:27017/ms-reporting_db" }
-$env:REPORTING_MONGODB_URI = $env:MONGODB_URI
+$mongodbUri = if ($env:MONGODB_URI) { $env:MONGODB_URI } else { "mongodb://localhost:27017/ms-reporting_db" }
 # ------------------------------------
 
 $identityCommand = @"
-`$env:IDENTITY_DB_URL = '$($env:IDENTITY_DB_URL)'
-`$env:IDENTITY_DB_USERNAME = '$($env:IDENTITY_DB_USERNAME)'
-`$env:IDENTITY_DB_PASSWORD = '$($env:IDENTITY_DB_PASSWORD)'
+`$env:SPRING_DATASOURCE_URL = `$null
+`$env:SPRING_DATASOURCE_USERNAME = `$null
+`$env:SPRING_DATASOURCE_PASSWORD = `$null
+`$env:IDENTITY_DB_URL = '$identityDbUrl'
+`$env:IDENTITY_DB_USERNAME = '$identityDbUsername'
+`$env:IDENTITY_DB_PASSWORD = '$identityDbPassword'
 Set-Location '$identityPath'
 .\mvnw.cmd spring-boot:run
 "@
 
 $reportingCommand = @"
-`$env:MONGODB_URI = '$($env:MONGODB_URI)'
-`$env:REPORTING_MONGODB_URI = '$($env:REPORTING_MONGODB_URI)'
+`$env:MONGODB_URI = '$mongodbUri'
+`$env:REPORTING_MONGODB_URI = '$mongodbUri'
 Set-Location '$reportingPath'
 .\mvnw.cmd spring-boot:run
 "@
 
 $geoCommand = @"
-`$env:SPRING_DATASOURCE_URL = '$($env:SPRING_DATASOURCE_URL)'
-`$env:SPRING_DATASOURCE_USERNAME = '$($env:SPRING_DATASOURCE_USERNAME)'
-`$env:SPRING_DATASOURCE_PASSWORD = '$($env:SPRING_DATASOURCE_PASSWORD)'
+`$env:SPRING_DATASOURCE_URL = '$geoDbUrl'
+`$env:SPRING_DATASOURCE_USERNAME = '$geoDbUsername'
+`$env:SPRING_DATASOURCE_PASSWORD = '$geoDbPassword'
+`$env:IDENTITY_DB_URL = `$null
+`$env:IDENTITY_DB_USERNAME = `$null
+`$env:IDENTITY_DB_PASSWORD = `$null
 Set-Location '$geoPath'
 .\mvnw.cmd spring-boot:run
 "@
 
 $gatewayCommand = @"
+`$env:SPRING_DATASOURCE_URL = `$null
+`$env:IDENTITY_DB_URL = `$null
 Set-Location '$gatewayPath'
 .\mvnw.cmd spring-boot:run
 "@

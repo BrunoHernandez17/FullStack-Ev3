@@ -27,16 +27,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [usersList, setUsersList] = useState<any[]>([]);
   const [geoList, setGeoList] = useState<any[]>([]);
 
+  // Helper to construct authorization headers
+  const getAuthHeaders = (extraHeaders: Record<string, string> = {}) => {
+    const savedUserStr = localStorage.getItem('sanos_y_salvos_user');
+    const savedUser = savedUserStr ? JSON.parse(savedUserStr) : null;
+    const token = user?.token || savedUser?.token;
+
+    const headers: Record<string, string> = { ...extraHeaders };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   // Helper to fetch all data from backend
   const fetchReports = async () => {
     try {
+      const headers = getAuthHeaders();
+
       // 1. Fetch reports
-      const resReports = await fetch('/api/reportes');
+      const resReports = await fetch('/api/reportes', { headers });
       if (!resReports.ok) throw new Error('Error al obtener reportes');
       const dataReports = await resReports.json();
 
       // 2. Fetch locations to map sector names
-      const resLocations = await fetch('/api/geo/historial');
+      const resLocations = await fetch('/api/geo/historial', { headers });
       const locationsMap: Record<number, string> = {};
       if (resLocations.ok) {
         const dataLocations = await resLocations.json();
@@ -47,7 +62,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // 3. Fetch users to map reporter names and emails
-      const resUsers = await fetch('/api/auth/usuarios');
+      const resUsers = await fetch('/api/auth/usuarios', { headers });
       const usersMap: Record<number, { nombre: string; email: string }> = {};
       if (resUsers.ok) {
         const dataUsers = await resUsers.json();
@@ -118,12 +133,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const role: 'admin' | 'user' = data.usuario.rol.toUpperCase() === 'ADMIN' ? 'admin' : 'user';
       
       const loggedUser: User = {
+        id: data.usuario.id,
         email: data.usuario.email,
         role,
         name: data.usuario.nombre,
+        token: data.token,
       };
-      // Keep user ID in context object
-      (loggedUser as any).id = data.usuario.id;
 
       setUser(loggedUser);
       localStorage.setItem('sanos_y_salvos_user', JSON.stringify(loggedUser));
@@ -167,7 +182,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1. Save location in ms-geolocation
       const locResponse = await fetch('/api/geo/ubicar', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           latitud: newReport.mapY,
           longitud: newReport.mapX,
@@ -179,10 +194,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedLoc = await locResponse.json();
 
       // 2. Save report in ms-reporting
-      const userId = user ? (user as any).id : null;
+      const userId = user ? user.id : null;
       const reportResponse = await fetch('/api/reportes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           tipoAnimal: newReport.type,
           descripcion: newReport.description,
@@ -209,7 +224,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteReport = async (id: string) => {
     try {
       const response = await fetch(`/api/reportes/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error('Error al eliminar el reporte');
       await fetchReports();
@@ -226,7 +242,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const response = await fetch(`/api/reportes/${updatedReport.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           id: updatedReport.id,
           tipoAnimal: updatedReport.type,
