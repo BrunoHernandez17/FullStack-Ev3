@@ -41,4 +41,7 @@ public class ReporteMascota {
     private Double mapY;
 
     private String fechaRegistro;
+
+    private java.util.List<Comentario> comentarios = new java.util.ArrayList<>();
 }
+

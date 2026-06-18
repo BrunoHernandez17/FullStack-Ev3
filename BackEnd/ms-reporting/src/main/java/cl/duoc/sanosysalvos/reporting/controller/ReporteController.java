@@ -1,7 +1,9 @@
 package cl.duoc.sanosysalvos.reporting.controller;
 
 import cl.duoc.sanosysalvos.reporting.model.ReporteMascota;
+import cl.duoc.sanosysalvos.reporting.model.Comentario;
 import cl.duoc.sanosysalvos.reporting.service.ReporteService;
+
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -52,4 +54,14 @@ public class ReporteController {
         reporteService.eliminarReporte(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/comentarios")
+    @Operation(summary = "Agregar un comentario a un reporte", description = "Agrega un comentario (con texto y opcionalmente foto) a un reporte existente.")
+    public ResponseEntity<ReporteMascota> agregarComentario(@PathVariable String id, @RequestBody Comentario comentario) {
+        comentario.setId(java.util.UUID.randomUUID().toString());
+        comentario.setFechaRegistro(java.time.LocalDateTime.now().toString());
+        ReporteMascota reporte = reporteService.agregarComentario(id, comentario);
+        return ResponseEntity.ok(reporte);
+    }
 }
+

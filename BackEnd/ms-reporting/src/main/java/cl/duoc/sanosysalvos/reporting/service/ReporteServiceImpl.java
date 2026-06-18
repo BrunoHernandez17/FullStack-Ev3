@@ -1,7 +1,9 @@
 package cl.duoc.sanosysalvos.reporting.service;
 
 import cl.duoc.sanosysalvos.reporting.model.ReporteMascota;
+import cl.duoc.sanosysalvos.reporting.model.Comentario;
 import cl.duoc.sanosysalvos.reporting.repository.ReporteRepository;
+
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class ReporteServiceImpl implements ReporteService {
         existente.setMapX(reporteMascota.getMapX());
         existente.setMapY(reporteMascota.getMapY());
         existente.setFechaRegistro(reporteMascota.getFechaRegistro());
+        existente.setComentarios(reporteMascota.getComentarios());
         
         return reporteRepository.save(existente);
     }
@@ -54,4 +57,17 @@ public class ReporteServiceImpl implements ReporteService {
         }
         reporteRepository.deleteById(id);
     }
+
+    @Override
+    public ReporteMascota agregarComentario(String id, Comentario comentario) {
+        ReporteMascota existente = reporteRepository.findById(id)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Reporte no encontrado con id: " + id));
+        if (existente.getComentarios() == null) {
+            existente.setComentarios(new java.util.ArrayList<>());
+        }
+        existente.getComentarios().add(comentario);
+        return reporteRepository.save(existente);
+    }
 }
+
